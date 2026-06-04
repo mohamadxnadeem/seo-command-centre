@@ -1,4 +1,5 @@
 import StatusDot from './StatusDot'
+import DiffView from './DiffView'
 
 function timeStr(ts) {
   return ts ? new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : null
@@ -70,7 +71,7 @@ export default function AgentCard({
         {isUpdate && proposed && st === 'done' && (
           <div className="mb-2">
             <div className="text-[10px] uppercase tracking-widest mb-1" style={{ color: agent.color }}>
-              {proposed.type === 'cms' ? 'Proposed CMS fields' : 'Proposed file (full)'}
+              {proposed.type === 'cms' ? 'Proposed CMS fields' : 'Proposed diff'}
             </div>
             {proposed.type === 'cms' ? (
               <div className="flex flex-col gap-1.5">
@@ -81,6 +82,8 @@ export default function AgentCard({
                   </div>
                 ))}
               </div>
+            ) : proposed.original != null ? (
+              <DiffView original={proposed.original} proposed={proposed.content} />
             ) : (
               <pre className="text-[10px] whitespace-pre-wrap leading-snug" style={{ color: 'var(--text)' }}>
                 {proposed.content.slice(0, 4000)}{proposed.content.length > 4000 ? '\n…(truncated preview)' : ''}

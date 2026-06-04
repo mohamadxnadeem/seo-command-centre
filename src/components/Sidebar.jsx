@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 
 const CATS = ['Main', 'Tours', 'Vehicles']
 
-export default function Sidebar({ site, pages, selectedUid, onSelect, cmsLoading, cmsError }) {
+export default function Sidebar({ site, pages, selectedUid, onSelect, cmsLoading, cmsError, onAuditAll, batchProgress }) {
   const [query, setQuery] = useState('')
 
   const grouped = useMemo(() => {
@@ -65,8 +65,19 @@ export default function Sidebar({ site, pages, selectedUid, onSelect, cmsLoading
         )}
       </div>
 
-      <div className="p-3 text-[10px]" style={{ borderTop: '1px solid var(--border)', color: 'var(--muted)' }}>
-        {pages.length} pages · {pages.filter((p) => p.type === 'static').length} file · {pages.filter((p) => p.type === 'cms').length} CMS
+      <div className="p-3 flex flex-col gap-2" style={{ borderTop: '1px solid var(--border)' }}>
+        {batchProgress && <div className="text-[10px]" style={{ color: '#34d399' }}>{batchProgress}</div>}
+        <button
+          onClick={onAuditAll}
+          disabled={!!batchProgress}
+          className="w-full py-1.5 rounded-md text-[11px] font-semibold disabled:opacity-50"
+          style={{ border: '1px solid #34d399', color: '#34d399' }}
+        >
+          Audit all {pages.length} pages
+        </button>
+        <div className="text-[10px]" style={{ color: 'var(--muted)' }}>
+          {pages.filter((p) => p.type === 'static').length} file · {pages.filter((p) => p.type === 'cms').length} CMS
+        </div>
       </div>
     </aside>
   )

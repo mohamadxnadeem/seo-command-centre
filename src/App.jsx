@@ -37,6 +37,7 @@ export default function App() {
   const [cmsState, setCmsState] = useState({ loading: false, error: null })
   const [selectedUid, setSelectedUid] = useState(null)
   const [instructions, setInstructions] = useState({}) // instructions[uid] = text
+  const [batchProgress, setBatchProgress] = useState(null)
 
   const { getPage, getSocial, runAudit, runSocial, runUpdate, approveUpdate } = useAgent()
 
@@ -82,6 +83,21 @@ export default function App() {
 
   const setInstruction = (uid, text) => setInstructions((prev) => ({ ...prev, [uid]: text }))
 
+  // Run the Copywriting Audit across every page, sequentially.
+  async function runAuditAll() {
+    if (batchProgress) return
+    const list = pages
+    for (let i = 0; i < list.length; i++) {
+      setBatchProgress(`Auditing ${i + 1}/${list.length} — ${list[i].name}`)
+      setSelectedUid(list[i].uid)
+      // eslint-disable-next-line no-await-in-loop
+      await runAudit(site, list[i]).catch(() => {})
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((r) => setTimeout(r, 500))
+    }
+    setBatchProgress(null)
+  }
+
   const socialState = getSocial(activeSiteId)
 
   return (
@@ -109,6 +125,8 @@ export default function App() {
           onSelect={setSelectedUid}
           cmsLoading={cmsState.loading}
           cmsError={cmsState.error}
+          onAuditAll={runAuditAll}
+          batchProgress={batchProgress}
         />
 
         <main className="flex-1 min-w-0 scroll-area p-5">
