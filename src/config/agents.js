@@ -1,103 +1,124 @@
-// Web search tool definition shared by the research + audit agents.
+// Web search tool (server-side tool executed by the Anthropic API).
 export const WEB_SEARCH_TOOL = {
   type: 'web_search_20250305',
   name: 'web_search',
-  max_uses: 5
+  max_uses: 5,
 }
 
-// Agent colours used across the UI for status dots and accents.
 export const AGENT_COLORS = {
-  research: '#c9982a', // gold
+  update: '#60a5fa', // blue
   audit: '#34d399', // emerald
-  updater: '#60a5fa' // blue
+  social: '#c9982a', // gold
 }
 
-// Build the per-page user message for each agent given the active site + page.
-function siteContext(site) {
-  return `Site: ${site.name} (${site.domain})\nBase URL: ${site.baseUrl}`
+const LUX_CONTEXT =
+  'These are luxury chauffeur & private-tour brands in Cape Town, South Africa, serving HNWI international clients from the US, UK, and Middle East. Tone is premium, confident, understated.'
+
+function pageLine(site, page) {
+  return `Site: ${site.name} (${site.domain})\nPage: ${page.name} — ${site.baseUrl}${page.path}\nPrimary keyword: "${page.primaryKw}"` +
+    (page.secondary?.length ? `\nSecondary: ${page.secondary.map((k) => `"${k}"`).join(', ')}` : '')
 }
 
 export const AGENTS = [
   {
-    id: 'research',
+    id: 'update',
     code: '01',
-    key: 'research',
-    name: 'Market Research Agent',
-    color: AGENT_COLORS.research,
-    tools: [WEB_SEARCH_TOOL],
+    key: 'update',
+    name: 'Site Update Agent',
+    color: AGENT_COLORS.update,
+    needsInstruction: true, // shows an instruction textarea
+    scope: 'page',
+    // tools chosen per-run (none — it edits code/content directly)
+    tools: [],
     system:
-      'You are an SEO market research specialist for luxury chauffeur and private tour services in Cape Town, South Africa targeting HNWI international clients from the US, UK, and Middle East. Be specific, name actual URLs, give immediately actionable insights.',
-    buildMessage: (site, page) =>
-      `${siteContext(site)}\n\n` +
-      `Page: ${page.name} — ${site.baseUrl}${page.path}\n` +
-      `Primary keyword: "${page.primaryKw}"\n` +
-      `Secondary keywords: ${(page.secondary || []).map((k) => `"${k}"`).join(', ')}\n\n` +
-      `Using web search, deliver a concise market research brief for this page:\n` +
-      `1. Search Google for the primary keyword and identify the top 5 page-1 competitors, naming their actual URLs.\n` +
-      `2. Identify 3 content gaps this page should fill versus those competitors.\n` +
-      `3. Suggest 3 long-tail keyword opportunities.\n` +
-      `4. State the single #1 priority action to rank this page.\n\n` +
-      `Format with clear headers. Be specific and actionable.`
+      `You are a senior Next.js (App Router) engineer and SEO copywriter. ${LUX_CONTEXT}\n\n` +
+      'You make precise, requested edits to a page. You NEVER change layout, structure, imports, components, or styling unless explicitly asked — you only change the copy/SEO the instruction targets. ' +
+      'For a source FILE you return the COMPLETE updated file verbatim with your change applied — no markdown fences, no commentary, no diff markers, just the raw file. ' +
+      'For a CMS record you return ONLY a JSON object of the fields to update.',
+    // ctx = { site, page, instruction, fileContent }
+    buildMessage: (ctx) => {
+      const { site, page, instruction, fileContent } = ctx
+      if (page.type === 'cms') {
+        const cur = page.seo || {}
+        return (
+          `${pageLine(site, page)}\n\n` +
+          `This is a CMS-managed ${page.kind === 'car' ? 'vehicle' : 'tour'} page. Current SEO fields:\n` +
+          `- meta_title: ${JSON.stringify(cur.meta_title)}\n` +
+          `- meta_description: ${JSON.stringify(cur.meta_description)}\n` +
+          `- highlight: ${JSON.stringify(cur.highlight)}\n` +
+          `- short_description: ${JSON.stringify(cur.short_description)}\n\n` +
+          `INSTRUCTION:\n${instruction}\n\n` +
+          `Return ONLY a JSON object containing the fields to change (subset of: meta_title [<=60 chars], ` +
+          `meta_description [<=160 chars, end with a WhatsApp CTA], title, short_description [<=300], highlight [<=300], body [HTML]). ` +
+          `Do not include unchanged fields. No markdown, no commentary.`
+        )
+      }
+      // static page → full file edit
+      const fence = '```'
+      return (
+        `${pageLine(site, page)}\n\n` +
+        `INSTRUCTION:\n${instruction}\n\n` +
+        `Here is the current source of ${page.filePath}:\n\n` +
+        `${fence}tsx\n${fileContent}\n${fence}\n\n` +
+        `Apply the instruction and return the COMPLETE updated file content only — raw, no fences, no explanation.`
+      )
+    },
   },
+
   {
     id: 'audit',
     code: '02',
     key: 'audit',
-    name: 'SEO Auditor Agent',
+    name: 'Copywriting Audit Agent',
     color: AGENT_COLORS.audit,
+    scope: 'page',
     tools: [WEB_SEARCH_TOOL],
     system:
-      'You are a senior technical SEO auditor for luxury chauffeur and private tour websites in Cape Town, South Africa serving HNWI international clients. You are rigorous, evidence-based, and you cite exactly what you find on the live page. Be specific and actionable.',
-    buildMessage: (site, page) =>
-      `${siteContext(site)}\n\n` +
-      `Page to audit: ${site.baseUrl}${page.path}\n` +
-      `Primary keyword: "${page.primaryKw}"\n` +
-      `Secondary keywords: ${(page.secondary || []).map((k) => `"${k}"`).join(', ')}\n\n` +
-      `Using web search, fetch the live page and audit it:\n` +
-      `1. Check the title tag, H1, meta description, schema markup, and content depth.\n` +
-      `2. Search Google for the primary keyword and estimate this page's ranking position.\n` +
-      `3. Check indexation with a "site:${site.domain}" style search.\n\n` +
-      `Then output, in this exact order:\n` +
-      `- SCORE: a single number out of 100, computed as title (20) + H1 (20) + meta description (15) + content depth (25) + Google ranking (20). Put it on its own line as "SCORE: NN/100".\n` +
-      `- A breakdown of the 5 score components.\n` +
-      `- A list of ALL issues, each tagged with severity: Critical / High / Medium.\n` +
-      `- TOP 3 FIXES: the three most impactful specific fixes.`
+      `You are an elite conversion copywriter and brand-voice auditor. ${LUX_CONTEXT}\n\n` +
+      'You audit the actual copy on a live page and give blunt, specific, actionable feedback to make it convert better and read more premium. You quote the real copy you find.',
+    // ctx = { site, page }
+    buildMessage: (ctx) => {
+      const { site, page } = ctx
+      return (
+        `${pageLine(site, page)}\n\n` +
+        `Use web search to read the live page, then audit its COPY (not technical SEO):\n` +
+        `1. Headline & hook — is it compelling for HNWI travellers? Quote it.\n` +
+        `2. Clarity, tone & brand voice — does it feel premium/understated or generic?\n` +
+        `3. Persuasion & trust — proof, specificity, objection handling.\n` +
+        `4. Calls to action — clear, confident, well-placed?\n\n` +
+        `Then give:\n` +
+        `- OVERALL: a one-line verdict + a /10 copy score.\n` +
+        `- TOP 3 REWRITES: for each, show the current copy and your improved version.\n` +
+        `Be specific and quote real text from the page.`
+      )
+    },
   },
+
   {
-    id: 'updater',
+    id: 'social',
     code: '03',
-    key: 'updater',
-    name: 'Content Updater Agent',
-    color: AGENT_COLORS.updater,
-    tools: [],
+    key: 'social',
+    name: 'Social Growth Agent',
+    color: AGENT_COLORS.social,
+    scope: 'site', // operates at the brand/site level
+    tools: [WEB_SEARCH_TOOL],
     system:
-      'You are an elite SEO copywriter for luxury chauffeur and private tour services in Cape Town, South Africa targeting HNWI international clients from the US, UK, and Middle East. You write in a premium, confident, understated-luxury tone. You output ONLY valid JSON — no markdown fences, no commentary, no explanation. Just the JSON object.',
-    buildMessage: (site, page) =>
-      `${siteContext(site)}\n\n` +
-      `Generate optimised SEO content for this page.\n` +
-      `Site id: "${site.id}"\n` +
-      `Page id: "${page.id}"\n` +
-      `Page path: "${page.path}"\n` +
-      `Primary keyword: "${page.primaryKw}"\n` +
-      `Secondary keywords: ${(page.secondary || []).map((k) => `"${k}"`).join(', ')}\n\n` +
-      `Return ONLY a JSON object with EXACTLY this structure (no markdown, no prose):\n` +
-      `{\n` +
-      `  "site": "${site.id}",\n` +
-      `  "page_id": "${page.id}",\n` +
-      `  "page_path": "${page.path}",\n` +
-      `  "seo": {\n` +
-      `    "title_tag": "under 60 chars, includes primary keyword",\n` +
-      `    "meta_description": "under 155 chars, includes keyword, ends with WhatsApp CTA",\n` +
-      `    "h1": "naturally includes primary keyword, premium tone",\n` +
-      `    "h2_subheadings": ["targets secondary kw 1", "targets secondary kw 2", "targets secondary kw 3"],\n` +
-      `    "seo_paragraph": "120 words, naturally weaves primary + secondary keywords, premium confident tone"\n` +
-      `  },\n` +
-      `  "schema": {\n` +
-      `    "type": "TouristTrip or Service or LocalBusiness depending on page type",\n` +
-      `    "json_ld": {}\n` +
-      `  }\n` +
-      `}`
-  }
+      `You are a social media growth strategist specialising in luxury travel and chauffeur brands. ${LUX_CONTEXT}\n\n` +
+      'You give concrete, current, platform-specific growth plays and you name real creators/influencers with their actual handles or URLs. You prioritise driving qualified traffic to the website.',
+    // ctx = { site }
+    buildMessage: (ctx) => {
+      const { site } = ctx
+      return (
+        `Brand: ${site.name} (${site.domain}) — ${site.baseUrl}\n\n` +
+        `Using web search where helpful, deliver a social growth + outreach brief:\n` +
+        `1. CHANNEL PLAN: the 2 highest-leverage platforms for this brand and what to post (formats, cadence, angle).\n` +
+        `2. CONTENT HOOKS: 5 specific post/reel ideas tailored to luxury Cape Town travel that drive website traffic.\n` +
+        `3. TRAFFIC PLAYS: 3 concrete tactics to convert social attention into site visits & enquiries.\n` +
+        `4. CREATOR OUTREACH: identify 5 real creators/influencers (Cape Town travel, luxury lifestyle, or relevant niches) to collaborate with — give their actual handle/URL, follower size if known, and a one-line reason + suggested collab.\n\n` +
+        `Be specific and current. Name real accounts.`
+      )
+    },
+  },
 ]
 
 export const AGENT_BY_KEY = AGENTS.reduce((acc, a) => {

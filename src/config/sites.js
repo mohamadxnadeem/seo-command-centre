@@ -1,3 +1,12 @@
+// Accurate map of both sites, derived from the real repos + Django backend.
+//
+// Each site has:
+//  - staticPages: real Next.js files (app/.../page.tsx) verified to exist.
+//    SEO for these lives in the page's `metadata` export → edited via GitHub.
+//  - collections: dynamic [slug] routes (Tours, Vehicles) whose content lives
+//    in the Django CMS (Experience / Carsforhire models). These are loaded at
+//    runtime from the live API and edited via the CMS SEO endpoints.
+
 export const SITES = {
   ctc: {
     id: 'ctc',
@@ -7,7 +16,7 @@ export const SITES = {
     color: '#16a05a',
     repo: 'mohamadxnadeem/capetown-concierge',
     branch: 'main',
-    pages: [
+    staticPages: [
       { id: 'home', name: 'Homepage', path: '/', filePath: 'app/page.tsx', cat: 'Main',
         primaryKw: 'luxury chauffeur Cape Town',
         secondary: ['private chauffeur Cape Town', 'chauffeur service Cape Town'] },
@@ -29,33 +38,16 @@ export const SITES = {
       { id: 'itinerary', name: '7-Day Itinerary', path: '/7-day-cape-town-itinerary', filePath: 'app/7-day-cape-town-itinerary/page.tsx', cat: 'Main',
         primaryKw: '7 day Cape Town itinerary',
         secondary: ['Cape Town travel itinerary', 'one week Cape Town'] },
-      { id: 'peninsula', name: 'Cape Peninsula Tour', path: '/private-tours/cape-peninsula-tour', filePath: 'app/private-tours/cape-peninsula-tour/page.tsx', cat: 'Tours',
-        primaryKw: 'Cape Peninsula private tour',
-        secondary: ['Cape Point tour Cape Town', 'Boulders Beach penguin tour'] },
-      { id: 'winelands', name: 'Winelands Tour', path: '/private-tours/winelands-chauffeur-drive', filePath: 'app/private-tours/winelands-chauffeur-drive/page.tsx', cat: 'Tours',
-        primaryKw: 'Stellenbosch Winelands private tour',
-        secondary: ['Franschhoek wine tour private', 'winelands chauffeur Cape Town'] },
-      { id: 'city-tour', name: 'City & Table Mountain', path: '/private-tours/cape-town-city-tour', filePath: 'app/private-tours/cape-town-city-tour/page.tsx', cat: 'Tours',
-        primaryKw: 'Cape Town city tour private chauffeur',
-        secondary: ['Table Mountain private tour', 'Bo-Kaap guided tour'] },
-      { id: 'safari', name: 'Sunset Safari', path: '/private-tours/sunset-safari-experience', filePath: 'app/private-tours/sunset-safari-experience/page.tsx', cat: 'Tours',
-        primaryKw: 'Aquila safari day trip Cape Town',
-        secondary: ['Big 5 safari Cape Town', 'safari day trip from Cape Town'] },
-      { id: 'bmw5', name: 'BMW 5-Series', path: '/chauffeur-services/bmw-5-series-for-hire-with-driver', filePath: 'app/chauffeur-services/bmw-5-series-for-hire-with-driver/page.tsx', cat: 'Vehicles',
-        primaryKw: 'BMW 5 Series chauffeur Cape Town', secondary: ['executive sedan hire Cape Town'] },
-      { id: 'bmwx5', name: 'BMW X5', path: '/chauffeur-services/BMW-X5-for-hire-with-driver', filePath: 'app/chauffeur-services/BMW-X5-for-hire-with-driver/page.tsx', cat: 'Vehicles',
-        primaryKw: 'BMW X5 chauffeur Cape Town', secondary: ['luxury SUV hire Cape Town'] },
-      { id: 'staria', name: 'Hyundai Staria', path: '/chauffeur-services/8-seater-staria-van-with-driver', filePath: 'app/chauffeur-services/8-seater-staria-van-with-driver/page.tsx', cat: 'Vehicles',
-        primaryKw: '8 seater van hire Cape Town', secondary: ['group transfer Cape Town'] },
-      { id: 'sclass', name: 'Mercedes S-Class', path: '/chauffeur-services/Mercedes-s-class-for-hire-with-driver', filePath: 'app/chauffeur-services/Mercedes-s-class-for-hire-with-driver/page.tsx', cat: 'Vehicles',
-        primaryKw: 'Mercedes S-Class hire Cape Town', secondary: ['VIP chauffeur Cape Town'] },
-      { id: 'sprinter', name: 'Mercedes Sprinter', path: '/chauffeur-services/Mercedes-sprinter-with-driver-cape-town', filePath: 'app/chauffeur-services/Mercedes-sprinter-with-driver-cape-town/page.tsx', cat: 'Vehicles',
-        primaryKw: 'Mercedes Sprinter hire Cape Town', secondary: ['14 seater van Cape Town'] },
-      { id: 'vclass', name: 'Mercedes V-Class', path: '/chauffeur-services/Mercedes-v-class-private-chauffeur-service', filePath: 'app/chauffeur-services/Mercedes-v-class-private-chauffeur-service/page.tsx', cat: 'Vehicles',
-        primaryKw: 'Mercedes V-Class chauffeur Cape Town', secondary: ['luxury group transport Cape Town'] },
-      { id: 'rangerover', name: 'Range Rover Sport', path: '/chauffeur-services/range-rover-sport-chauffeur-service', filePath: 'app/chauffeur-services/range-rover-sport-chauffeur-service/page.tsx', cat: 'Vehicles',
-        primaryKw: 'Range Rover chauffeur Cape Town', secondary: ['Range Rover hire Cape Town'] },
-    ]
+      { id: 'contact', name: 'Contact', path: '/contact', filePath: 'app/contact/page.tsx', cat: 'Main',
+        primaryKw: 'book luxury chauffeur Cape Town',
+        secondary: ['contact Cape Town chauffeur', 'Cape Town concierge booking'] },
+    ],
+    collections: [
+      { id: 'tours', name: 'Private Tours', cat: 'Tours', kind: 'experience',
+        listPath: '/api/experiences/all/', routeBase: '/private-tours' },
+      { id: 'vehicles', name: 'Vehicles', cat: 'Vehicles', kind: 'car',
+        listPath: '/api/cars-for-hire/all/', routeBase: '/chauffeur-services' },
+    ],
   },
 
   sigma: {
@@ -66,16 +58,13 @@ export const SITES = {
     color: '#c9982a',
     repo: 'mohamadxnadeem/sigma-chauffeur',
     branch: 'main',
-    pages: [
+    staticPages: [
       { id: 'home', name: 'Homepage', path: '/', filePath: 'app/page.tsx', cat: 'Main',
         primaryKw: 'VIP chauffeur service Cape Town',
         secondary: ['premium chauffeur Cape Town', 'luxury transport Cape Town'] },
       { id: 'chauffeur', name: 'Chauffeur Services', path: '/chauffeur-services', filePath: 'app/chauffeur-services/page.tsx', cat: 'Main',
         primaryKw: 'chauffeur service Cape Town',
         secondary: ['professional driver Cape Town', 'private driver hire Cape Town'] },
-      { id: 'airport', name: 'Airport Transfers', path: '/airport-transfers-cape-town', filePath: 'app/airport-transfers-cape-town/page.tsx', cat: 'Main',
-        primaryKw: 'luxury airport transfer Cape Town',
-        secondary: ['Cape Town airport chauffeur', 'CPT airport private transfer'] },
       { id: 'wine-farms', name: 'Wine Farms Guide', path: '/best-wine-farms-in-cape-town', filePath: 'app/best-wine-farms-in-cape-town/page.tsx', cat: 'Main',
         primaryKw: 'Cape Town wine tour private driver',
         secondary: ['Stellenbosch wine tasting tour', 'Franschhoek wine farms'] },
@@ -85,37 +74,58 @@ export const SITES = {
       { id: 'itinerary', name: '7-Day Itinerary', path: '/7-day-cape-town-itinerary', filePath: 'app/7-day-cape-town-itinerary/page.tsx', cat: 'Main',
         primaryKw: 'Cape Town 7 day travel guide',
         secondary: ['Cape Town itinerary planning', 'week in Cape Town luxury'] },
-      { id: 'contact', name: 'Contact', path: '/contact', filePath: 'app/contact/page.tsx', cat: 'Main',
-        primaryKw: 'book VIP chauffeur Cape Town',
-        secondary: ['hire chauffeur Cape Town', 'Cape Town chauffeur booking'] },
-      { id: 'peninsula', name: 'Cape Peninsula Tour', path: '/private-tours/cape-peninsula-tour', filePath: 'app/private-tours/cape-peninsula-tour/page.tsx', cat: 'Tours',
-        primaryKw: 'Cape Peninsula tour with driver Cape Town',
-        secondary: ['Cape Point private day tour', 'Boulders Beach private transfer'] },
-      { id: 'winelands', name: 'Winelands Tour', path: '/private-tours/winelands-chauffeur-drive', filePath: 'app/private-tours/winelands-chauffeur-drive/page.tsx', cat: 'Tours',
-        primaryKw: 'Winelands private chauffeur Cape Town',
-        secondary: ['Stellenbosch wine day trip', 'Cape Winelands private tour'] },
-      { id: 'city-tour', name: 'City & Table Mountain', path: '/private-tours/cape-town-city-tour', filePath: 'app/private-tours/cape-town-city-tour/page.tsx', cat: 'Tours',
-        primaryKw: 'Cape Town sightseeing private driver',
-        secondary: ['Table Mountain tour private', 'Cape Town city highlights tour'] },
-      { id: 'safari', name: 'Sunset Safari', path: '/private-tours/sunset-safari-experience', filePath: 'app/private-tours/sunset-safari-experience/page.tsx', cat: 'Tours',
-        primaryKw: 'safari day trip Cape Town private',
-        secondary: ['Aquila game reserve Cape Town', 'Big 5 day tour Cape Town'] },
-      { id: 'bmw5', name: 'BMW 5-Series', path: '/chauffeur-services/bmw-5-series-for-hire-with-driver', filePath: 'app/chauffeur-services/bmw-5-series-for-hire-with-driver/page.tsx', cat: 'Vehicles',
-        primaryKw: 'BMW 5 Series private driver Cape Town', secondary: ['executive car Cape Town'] },
-      { id: 'bmwx5', name: 'BMW X5', path: '/chauffeur-services/bmw-x5-for-hire-with-driver', filePath: 'app/chauffeur-services/bmw-x5-for-hire-with-driver/page.tsx', cat: 'Vehicles',
-        primaryKw: 'BMW X5 private hire Cape Town', secondary: ['luxury SUV driver Cape Town'] },
-      { id: 'staria', name: 'Hyundai Staria', path: '/chauffeur-services/8-seater-staria-van-with-driver', filePath: 'app/chauffeur-services/8-seater-staria-van-with-driver/page.tsx', cat: 'Vehicles',
-        primaryKw: '8 seater minibus hire Cape Town', secondary: ['group tour Cape Town'] },
-      { id: 'sclass', name: 'Mercedes S-Class', path: '/chauffeur-services/mercedes-s-class-for-hire-with-driver', filePath: 'app/chauffeur-services/mercedes-s-class-for-hire-with-driver/page.tsx', cat: 'Vehicles',
-        primaryKw: 'Mercedes S-Class VIP Cape Town', secondary: ['luxury sedan Cape Town'] },
-      { id: 'sprinter', name: 'Mercedes Sprinter', path: '/chauffeur-services/mercedes-sprinter-with-driver-cape-town', filePath: 'app/chauffeur-services/mercedes-sprinter-with-driver-cape-town/page.tsx', cat: 'Vehicles',
-        primaryKw: 'Mercedes Sprinter group hire Cape Town', secondary: ['large group transport Cape Town'] },
-      { id: 'vclass', name: 'Mercedes V-Class', path: '/chauffeur-services/mercedes-v-class-private-chauffeur-service', filePath: 'app/chauffeur-services/mercedes-v-class-private-chauffeur-service/page.tsx', cat: 'Vehicles',
-        primaryKw: 'Mercedes V-Class private hire Cape Town', secondary: ['minivan chauffeur Cape Town'] },
-      { id: 'rangerover', name: 'Range Rover Sport', path: '/chauffeur-services/range-rover-sport-chauffeur-service', filePath: 'app/chauffeur-services/range-rover-sport-chauffeur-service/page.tsx', cat: 'Vehicles',
-        primaryKw: 'Range Rover Sport hire Cape Town', secondary: ['luxury 4x4 Cape Town'] },
-    ]
-  }
+    ],
+    collections: [
+      { id: 'tours', name: 'Private Tours', cat: 'Tours', kind: 'experience',
+        listPath: '/api/experiences/all/', routeBase: '/private-tours' },
+      { id: 'vehicles', name: 'Vehicles', cat: 'Vehicles', kind: 'car',
+        listPath: '/api/cars-for-hire/all/', routeBase: '/chauffeur-services' },
+    ],
+  },
 }
 
 export const SITE_LIST = [SITES.ctc, SITES.sigma]
+
+// Normalise a static page config into the unified "page" shape the UI uses.
+export function staticPageToEntry(site, p) {
+  return {
+    uid: `${site.id}:static:${p.id}`,
+    id: p.id,
+    type: 'static',
+    name: p.name,
+    path: p.path,
+    filePath: p.filePath,
+    cat: p.cat,
+    primaryKw: p.primaryKw,
+    secondary: p.secondary || [],
+  }
+}
+
+// Normalise a CMS item (from /api/experiences/all/ or /api/cars-for-hire/all/)
+// into the unified "page" shape. The list endpoints wrap each item, e.g.
+// { experience: {...} } or { car: {...} }; we unwrap defensively.
+export function cmsItemToEntry(site, collection, raw) {
+  const item = raw?.experience || raw?.car || raw || {}
+  const slug = item.slug || ''
+  const title = item.title || 'Untitled'
+  return {
+    uid: `${site.id}:${collection.id}:${item.id}`,
+    id: `${collection.id}-${item.id}`,
+    type: 'cms',
+    kind: collection.kind, // experience | car
+    cmsId: item.id,
+    name: title,
+    slug,
+    path: `${collection.routeBase}/${slug}`,
+    cat: collection.cat,
+    primaryKw: `${title} Cape Town`,
+    secondary: [],
+    seo: {
+      meta_title: item.meta_title || '',
+      meta_description: item.meta_description || '',
+      short_description: item.short_description || '',
+      highlight: item.highlight || '',
+      body: item.body || '',
+    },
+  }
+}

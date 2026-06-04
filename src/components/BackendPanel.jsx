@@ -10,12 +10,8 @@ export default function BackendPanel({ settings, setSetting, onClose }) {
     setTesting(true)
     setResult(null)
     try {
-      const ok = await testDjangoConnection(settings.djangoUrl, settings.djangoToken)
-      setResult(
-        ok
-          ? { ok: true, msg: '✓ Connected to Django API' }
-          : { ok: false, msg: '✕ Django responded but not OK (check token / endpoint)' }
-      )
+      const ok = await testDjangoConnection(settings.djangoUrl)
+      setResult(ok ? { ok: true, msg: '✓ Reached Django API (/api/experiences/all/)' } : { ok: false, msg: '✕ Django reachable but endpoint not OK' })
     } catch (e) {
       setResult({ ok: false, msg: `✕ ${e.message}` })
     }
@@ -23,19 +19,22 @@ export default function BackendPanel({ settings, setSetting, onClose }) {
   }
 
   return (
-    <Panel title="Django Backend Configuration" onClose={onClose}>
+    <Panel title="Django CMS Configuration" onClose={onClose}>
+      <Field label="API URL" value={settings.djangoUrl} onChange={(v) => setSetting('djangoUrl', v)} />
       <Field
-        label="API URL"
-        value={settings.djangoUrl}
-        onChange={(v) => setSetting('djangoUrl', v)}
-      />
-      <Field
-        label="Auth Token"
+        label="SEO Update Key (X-SEO-Key)"
         type="password"
-        value={settings.djangoToken}
-        placeholder="DRF token…"
-        onChange={(v) => setSetting('djangoToken', v)}
+        value={settings.seoKey}
+        placeholder="matches SEO_UPDATE_KEY on the server"
+        onChange={(v) => setSetting('seoKey', v)}
       />
+      <p className="text-[11px] leading-relaxed" style={{ color: 'var(--muted)' }}>
+        The SEO key is sent as <code style={{ color: 'var(--text)' }}>X-SEO-Key</code> to the CMS update endpoints
+        (<code style={{ color: 'var(--text)' }}>/api/experiences/&lt;id&gt;/seo/</code> and{' '}
+        <code style={{ color: 'var(--text)' }}>/api/cars-for-hire/&lt;id&gt;/seo/</code>). It must match the{' '}
+        <code style={{ color: 'var(--text)' }}>SEO_UPDATE_KEY</code> env var on the Django server. Tours &amp; Vehicles
+        are loaded live from this API.
+      </p>
 
       <button
         onClick={test}
@@ -47,14 +46,7 @@ export default function BackendPanel({ settings, setSetting, onClose }) {
       </button>
 
       {result && (
-        <div
-          className="mt-2 text-[11px] p-2 rounded-md"
-          style={{
-            background: 'var(--bg)',
-            border: '1px solid var(--border)',
-            color: result.ok ? 'var(--green)' : 'var(--red)'
-          }}
-        >
+        <div className="mt-2 text-[11px] p-2 rounded-md" style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: result.ok ? 'var(--green)' : 'var(--red)' }}>
           {result.msg}
         </div>
       )}

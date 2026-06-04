@@ -1,22 +1,11 @@
 import { useState, useCallback, useRef } from 'react'
 import { runAgent } from '../services/anthropic'
-import { readFile, writeFile, patchMetadata } from '../services/github'
-import { pushToDjango } from '../services/django'
+import { readFile, proposeFileChange } from '../services/github'
+import { updateCmsSeo } from '../services/django'
 import { AGENT_BY_KEY } from '../config/agents'
 
-// Parse "SCORE: 84/100" (or "84 / 100", "Score 84") out of the auditor output.
-export function parseScore(text) {
-  if (!text) return null
-  const m =
-    text.match(/score[^0-9]{0,12}(\d{1,3})\s*\/\s*100/i) ||
-    text.match(/score[^0-9]{0,12}(\d{1,3})/i)
-  if (!m) return null
-  const n = parseInt(m[1], 10)
-  return n >= 0 && n <= 100 ? n : null
-}
-
-// Extract the JSON object from the Updater output (tolerates stray fences/prose).
-export function parseUpdaterJson(text) {
+// Pull a JSON object out of model output (tolerates fences/prose).
+export function parseJsonObject(text) {
   if (!text) return null
   let raw = text.trim()
   const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/i)
@@ -31,124 +20,145 @@ export function parseUpdaterJson(text) {
   }
 }
 
+// Strip an accidental ```tsx fence the model may wrap a full file in.
+function stripCodeFence(text) {
+  const m = text.match(/```(?:tsx|ts|jsx|js)?\s*\n([\s\S]*?)\n```/)
+  return m ? m[1] : text.trim()
+}
+
 const emptyAgent = () => ({ status: 'idle', output: '', error: null, ranAt: null })
 
-const emptyPage = () => ({
-  research: emptyAgent(),
-  audit: emptyAgent(),
-  updater: emptyAgent(),
-  score: null,
-  json: null,
-  django: { status: 'idle', at: null, error: null },
-  github: { status: 'idle', sha: null, url: null, at: null, error: null }
-})
-
 export function useAgent() {
-  const [state, setState] = useState({}) // state[siteId][pageId] = {...}
-  const stateRef = useRef(state)
-  stateRef.current = state
+  const [pages, setPages] = useState({}) // pages[uid] = { update, audit }
+  const [sites, setSites] = useState({}) // sites[siteId] = { social }
+  const pagesRef = useRef(pages)
+  pagesRef.current = pages
 
-  const getPage = useCallback((siteId, pageId) => {
-    return stateRef.current?.[siteId]?.[pageId] || emptyPage()
+  const getPage = useCallback((uid) => {
+    return (
+      pagesRef.current[uid] || {
+        update: { ...emptyAgent(), proposed: null, pr: null },
+        audit: emptyAgent(),
+      }
+    )
   }, [])
 
-  const mutate = useCallback((siteId, pageId, updater) => {
-    setState((prev) => {
-      const site = prev[siteId] || {}
-      const page = site[pageId] || emptyPage()
-      const next = updater(page)
-      return { ...prev, [siteId]: { ...site, [pageId]: next } }
+  const getSocial = useCallback((siteId) => sites[siteId]?.social || emptyAgent(), [sites])
+
+  const mutPage = useCallback((uid, fn) => {
+    setPages((prev) => {
+      const cur = prev[uid] || {
+        update: { ...emptyAgent(), proposed: null, pr: null },
+        audit: emptyAgent(),
+      }
+      return { ...prev, [uid]: fn(cur) }
     })
   }, [])
 
-  // Run a single agent (research | audit | updater) on a site/page.
-  const run = useCallback(
-    async (site, page, agentKey) => {
-      const agent = AGENT_BY_KEY[agentKey]
-      if (!agent) return
-      mutate(site.id, page.id, (p) => ({
-        ...p,
-        [agentKey]: { status: 'running', output: '', error: null, ranAt: null }
-      }))
+  // ---- Copywriting Audit (read-only) ----
+  const runAudit = useCallback(
+    async (site, page) => {
+      const agent = AGENT_BY_KEY.audit
+      mutPage(page.uid, (p) => ({ ...p, audit: { status: 'running', output: '', error: null, ranAt: null } }))
       try {
-        const out = await runAgent(agent.system, agent.buildMessage(site, page), agent.tools)
-        mutate(site.id, page.id, (p) => {
-          const patch = {
-            ...p,
-            [agentKey]: { status: 'done', output: out, error: null, ranAt: Date.now() }
-          }
-          if (agentKey === 'audit') patch.score = parseScore(out) ?? p.score
-          if (agentKey === 'updater') patch.json = parseUpdaterJson(out)
-          return patch
-        })
+        const out = await runAgent(agent.system, agent.buildMessage({ site, page }), agent.tools)
+        mutPage(page.uid, (p) => ({ ...p, audit: { status: 'done', output: out, error: null, ranAt: Date.now() } }))
         return out
       } catch (e) {
-        mutate(site.id, page.id, (p) => ({
+        mutPage(page.uid, (p) => ({ ...p, audit: { status: 'error', output: '', error: e.message, ranAt: Date.now() } }))
+        throw e
+      }
+    },
+    [mutPage]
+  )
+
+  // ---- Social Growth (read-only, site-level) ----
+  const runSocial = useCallback(async (site) => {
+    const agent = AGENT_BY_KEY.social
+    setSites((prev) => ({ ...prev, [site.id]: { social: { status: 'running', output: '', error: null, ranAt: null } } }))
+    try {
+      const out = await runAgent(agent.system, agent.buildMessage({ site }), agent.tools)
+      setSites((prev) => ({ ...prev, [site.id]: { social: { status: 'done', output: out, error: null, ranAt: Date.now() } } }))
+      return out
+    } catch (e) {
+      setSites((prev) => ({ ...prev, [site.id]: { social: { status: 'error', output: '', error: e.message, ranAt: Date.now() } } }))
+      throw e
+    }
+  }, [])
+
+  // ---- Site Update: generate a proposed change (does NOT publish) ----
+  const runUpdate = useCallback(
+    async (site, page, instruction, settings) => {
+      const agent = AGENT_BY_KEY.update
+      mutPage(page.uid, (p) => ({
+        ...p,
+        update: { status: 'running', output: '', error: null, ranAt: null, proposed: null, pr: null },
+      }))
+      try {
+        let ctx = { site, page, instruction }
+        let original = null
+        let sha = null
+        if (page.type === 'static') {
+          const f = await readFile(site.repo, page.filePath, site.branch, settings.githubToken)
+          original = f.content
+          sha = f.sha
+          ctx.fileContent = original
+        }
+        const out = await runAgent(agent.system, agent.buildMessage(ctx), agent.tools)
+
+        let proposed
+        if (page.type === 'cms') {
+          const fields = parseJsonObject(out)
+          if (!fields) throw new Error('Could not parse the proposed CMS fields as JSON.')
+          proposed = { type: 'cms', fields }
+        } else {
+          proposed = { type: 'static', original, sha, content: stripCodeFence(out) }
+        }
+        mutPage(page.uid, (p) => ({
           ...p,
-          [agentKey]: { status: 'error', output: '', error: e.message, ranAt: Date.now() }
+          update: { status: 'done', output: out, error: null, ranAt: Date.now(), proposed, pr: null },
+        }))
+        return out
+      } catch (e) {
+        mutPage(page.uid, (p) => ({
+          ...p,
+          update: { ...p.update, status: 'error', error: e.message, ranAt: Date.now() },
         }))
         throw e
       }
     },
-    [mutate]
+    [mutPage]
   )
 
-  // Fire all three agents for a page concurrently.
-  const runAll = useCallback(
-    async (site, page) => {
-      await Promise.allSettled([
-        run(site, page, 'research'),
-        run(site, page, 'audit'),
-        run(site, page, 'updater')
-      ])
-    },
-    [run]
-  )
-
-  // Push the Updater JSON for a page to Django.
-  const pushDjango = useCallback(
-    async (site, page, apiUrl, token) => {
-      const json = getPage(site.id, page.id).json
-      if (!json) throw new Error('No Updater JSON for this page. Run the Updater agent first.')
-      mutate(site.id, page.id, (p) => ({ ...p, django: { status: 'running', at: null, error: null } }))
+  // ---- Site Update: publish the proposed change (PR for static, PATCH for CMS) ----
+  const approveUpdate = useCallback(
+    async (site, page, settings) => {
+      const proposed = getPage(page.uid).update.proposed
+      if (!proposed) throw new Error('Nothing to publish — run the Site Update agent first.')
+      mutPage(page.uid, (p) => ({ ...p, update: { ...p.update, pr: { status: 'running' } } }))
       try {
-        await pushToDjango(apiUrl, token, json)
-        mutate(site.id, page.id, (p) => ({ ...p, django: { status: 'done', at: Date.now(), error: null } }))
-      } catch (e) {
-        mutate(site.id, page.id, (p) => ({ ...p, django: { status: 'error', at: Date.now(), error: e.message } }))
-        throw e
-      }
-    },
-    [getPage, mutate]
-  )
-
-  // Push the Updater JSON for a page to GitHub (patches metadata + commits).
-  const pushGithub = useCallback(
-    async (site, page, repo, branch, token) => {
-      const json = getPage(site.id, page.id).json
-      if (!json) throw new Error('No Updater JSON for this page. Run the Updater agent first.')
-      const seo = json.seo || {}
-      mutate(site.id, page.id, (p) => ({ ...p, github: { ...p.github, status: 'running', error: null } }))
-      try {
-        const { content, sha } = await readFile(repo, page.filePath, branch, token)
-        const updated = patchMetadata(content, seo.title_tag || '', seo.meta_description || '')
-        const commitMsg = `SEO [Updater]: ${page.name} → '${page.primaryKw}' — ${site.name}`
-        const result = await writeFile(repo, page.filePath, updated, sha, commitMsg, branch, token)
-        mutate(site.id, page.id, (p) => ({
+        if (proposed.type === 'cms') {
+          const result = await updateCmsSeo(settings.djangoUrl, settings.seoKey, page.kind, page.cmsId, proposed.fields)
+          mutPage(page.uid, (p) => ({ ...p, update: { ...p.update, pr: { status: 'done', kind: 'cms', result, at: Date.now() } } }))
+          return result
+        }
+        const title = `SEO [Site Update]: ${page.name} — ${site.name}`
+        const body =
+          `Automated SEO copy update generated by the SEO Command Centre.\n\n` +
+          `**Page:** ${site.baseUrl}${page.path}\n**File:** \`${page.filePath}\`\n\nReview the diff before merging.`
+        const r = await proposeFileChange(site.repo, page.filePath, proposed.content, site.branch, title, body, settings.githubToken)
+        mutPage(page.uid, (p) => ({
           ...p,
-          github: { status: 'done', sha: result.sha, url: result.commitUrl, at: Date.now(), error: null }
+          update: { ...p.update, pr: { status: 'done', kind: 'pr', url: r.prUrl, branch: r.branch, prError: r.prError, at: Date.now() } },
         }))
-        return result
+        return r
       } catch (e) {
-        const msg = e.message?.includes('Cannot read')
-          ? `File not found at ${page.filePath} — verify path in sites config`
-          : e.message
-        mutate(site.id, page.id, (p) => ({ ...p, github: { ...p.github, status: 'error', at: Date.now(), error: msg } }))
+        mutPage(page.uid, (p) => ({ ...p, update: { ...p.update, pr: { status: 'error', error: e.message, at: Date.now() } } }))
         throw e
       }
     },
-    [getPage, mutate]
+    [getPage, mutPage]
   )
 
-  return { state, getPage, run, runAll, pushDjango, pushGithub }
+  return { pages, sites, getPage, getSocial, runAudit, runSocial, runUpdate, approveUpdate }
 }

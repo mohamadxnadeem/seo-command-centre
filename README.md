@@ -8,22 +8,24 @@ Built with **React 18 + Vite + Tailwind CSS**. Deploys to **Vercel**.
 
 ## 1. What this app does
 
-For every page of both sites you can run three Claude agents (model `claude-sonnet-4-20250514`):
+There are three Claude agents (model `claude-sonnet-4-20250514`):
 
-| # | Agent | Tools | What it does |
-|---|-------|-------|--------------|
-| 01 | **Market Research** | `web_search_20250305` | Finds the top-5 page-1 competitors, 3 content gaps, 3 long-tail keywords and the single #1 priority action for the page's primary keyword. |
-| 02 | **SEO Auditor** | `web_search_20250305` | Fetches the live page, checks title/H1/meta/schema/content depth + Google ranking, scores it **/100**, and lists issues by severity with the top 3 fixes. |
-| 03 | **Content Updater** | none | Generates optimised SEO content as **strict JSON** (title tag, meta description, H1, H2s, 120-word paragraph, schema). |
+| # | Agent | Scope | Tools | What it does |
+|---|-------|-------|-------|--------------|
+| 01 | **Site Update** | page | none | You type an instruction; it edits the page and proposes the change. **Static pages** → edits the `page.tsx` and **opens a GitHub PR** for your review. **CMS pages** (Tours/Vehicles) → drafts `meta_title`/`meta_description`/`body` and, on approval, `PATCH`es the Django CMS. |
+| 02 | **Copywriting Audit** | page | `web_search` | Reads the live page copy and returns a blunt critique + the top 3 rewrites (current vs improved). Read-only. |
+| 03 | **Social Growth** | site | `web_search` | Channel plan, content hooks, traffic plays, and a list of **real creators/influencers to collaborate with** (handles/URLs). Read-only. |
 
-After the Updater runs you can:
+### Two kinds of pages
 
-- **Push to Django →** — POSTs the JSON to `/api/seo/` on the Django backend.
-- **Push to GitHub → Live in 60s** — reads the page's `page.tsx`, patches the App-Router `metadata` (title + description), commits to `main`, and Vercel auto-deploys.
+- **Static pages** — real `app/.../page.tsx` files in the site repo. SEO lives in the `metadata` export → updated via **GitHub PR** (you approve & merge → Vercel deploys).
+- **Dynamic pages (Tours & Vehicles)** — content lives in the **Django CMS** (`Experience` / `Carsforhire` models) and is served by `[slug]` routes. These are loaded live from `/api/experiences/all/` + `/api/cars-for-hire/all/`, and updated via the authenticated CMS SEO endpoints (`X-SEO-Key`).
 
-Both sites share the same page structure but **target different primary keywords** so Google never ranks them against each other (see the banner in the UI).
+Both sites **target different primary keywords** so Google never ranks them against each other (see the banner in the UI).
 
-Batch operations let you run all 3 agents across every page, and bulk-push all completed pages to GitHub/Django.
+### Backend requirement
+
+The CMS update path needs the companion PR on **`why-cpt-backend`** (branch `seo/cms-seo-update-endpoint`) merged, and `SEO_UPDATE_KEY` set as an env var on the server. It adds `PATCH /api/experiences/<id>/seo/` and `PATCH /api/cars-for-hire/<id>/seo/`.
 
 ---
 
@@ -34,8 +36,8 @@ All values are **also editable in the UI** (top-bar **AI / Django / GitHub** pan
 | Variable | Purpose | Where to get it |
 |----------|---------|-----------------|
 | `VITE_DJANGO_API_URL` | Django backend base URL | Already set: `https://web-production-1ab9.up.railway.app` |
-| `VITE_DJANGO_AUTH_TOKEN` | DRF token for the Django API | Django admin → Tokens, or `python manage.py drf_create_token <user>` |
-| `VITE_GITHUB_TOKEN` | GitHub PAT (read + write repo contents) | See below |
+| `VITE_SEO_UPDATE_KEY` | Shared secret for the CMS SEO endpoints (`X-SEO-Key`) | Must match `SEO_UPDATE_KEY` set on the Django server |
+| `VITE_GITHUB_TOKEN` | GitHub PAT (Contents + Pull requests: read & write) | See below |
 | `VITE_CTC_GITHUB_REPO` | CTC repo | `mohamadxnadeem/capetown-concierge` |
 | `VITE_SIGMA_GITHUB_REPO` | Sigma repo | `mohamadxnadeem/sigma-chauffeur` |
 | `VITE_GITHUB_BRANCH` | Deploy branch | `main` |
@@ -44,8 +46,8 @@ All values are **also editable in the UI** (top-bar **AI / Django / GitHub** pan
 ### GitHub Personal Access Token
 
 1. GitHub → **Settings → Developer settings → Personal access tokens**.
-2. **Fine-grained token** (recommended): grant access to `capetown-concierge` and `sigma-chauffeur`, with **Repository contents → Read and write**. (A classic token with the `repo` scope also works.)
-3. Copy the token (`ghp_…` / `github_pat_…`) into the **GitHub** panel or `VITE_GITHUB_TOKEN`.
+2. **Fine-grained token** (recommended): grant access to `capetown-concierge`, `sigma-chauffeur` (and `why-cpt-backend` if you want PRs opened there too), with **Repository contents → Read and write** *and* **Pull requests → Read and write** (so the Site Update agent can open PRs automatically; without it, the app still pushes a branch and gives you a compare link).
+3. Copy the token (`github_pat_…`) into the **GitHub** panel or `VITE_GITHUB_TOKEN`.
 
 ### Anthropic API key
 
@@ -53,15 +55,9 @@ All values are **also editable in the UI** (top-bar **AI / Django / GitHub** pan
 2. Paste it into the **AI** panel in the top bar, or set `VITE_ANTHROPIC_API_KEY`.
 3. The key is stored in your browser only and sent directly to the Anthropic API (browser-direct access header).
 
-### Django auth token
+### SEO update key (Django CMS)
 
-The app sends `Authorization: Token <token>` to `POST /api/seo/`. Generate one in Django:
-
-```bash
-python manage.py drf_create_token <your-username>
-```
-
-Paste it into the **Django** panel or `VITE_DJANGO_AUTH_TOKEN`.
+The app sends `X-SEO-Key: <key>` to the CMS SEO endpoints. Set the same value as the `SEO_UPDATE_KEY` environment variable on the Django/Railway server, then paste it into the **Django** panel or `VITE_SEO_UPDATE_KEY`.
 
 ---
 
@@ -93,13 +89,11 @@ Open the printed URL (default <http://localhost:5173>). Then:
 
 ## 5. Using each agent
 
-1. Pick a **site** (top-bar tabs) and a **page** (left sidebar, grouped Main / Tours / Vehicles).
-2. On the page's three agent cards press **RUN** (or **Run All Agents** to fire all three at once).
-   - **Research** and **Audit** stream a text report into the card.
-   - **Audit** also sets the page's **/100 score** (shown in the sidebar, header and matrix).
-   - **Updater** produces JSON and unlocks the two push buttons.
-3. Press **Push to Django →** to save the JSON, or **Push to GitHub → Live in 60s** to commit the metadata change. The matrix shows the short commit SHA as a clickable link.
-4. **Batch:** *Run All N Pages* (sidebar) runs every page sequentially with progress; *Push All → GitHub* / *Push All → Django* bulk-push every completed page.
+1. Pick a **site** (top-bar tabs) and a **page** (left sidebar, grouped Main / Tours / Vehicles; pages are tagged `FILE` or `CMS`). Tours/Vehicles load live from the Django API.
+2. **Site Update (01):** type an instruction → **GENERATE**. The agent proposes the change (full file for `FILE` pages, fields for `CMS` pages). Review it, then **Approve → Open PR** (static) or **Approve → Apply to CMS** (dynamic). Nothing goes live until you approve — and static edits land as a PR you still have to merge.
+3. **Copywriting Audit (02):** **RUN** to get a live copy critique + top 3 rewrites.
+4. **Social Growth (03):** **RUN** (site-level) for a growth/traffic plan + real creators to collaborate with.
+5. The **Pages Matrix** tracks Update/Audit status per page and links the opened PR / shows ✓ CMS once published.
 
 ---
 
