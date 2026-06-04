@@ -19,6 +19,26 @@ function pageLine(site, page) {
     (page.secondary?.length ? `\nSecondary: ${page.secondary.map((k) => `"${k}"`).join(', ')}` : '')
 }
 
+// Format live Google Search Console data into a prompt block (if available).
+export function gscSummary(gsc) {
+  if (!gsc || gsc.status !== 'done') return ''
+  const idx = gsc.index
+    ? `Index status: ${gsc.index.coverageState || gsc.index.verdict || 'unknown'}`
+    : 'Index status: unknown'
+  const kws = (gsc.rows || [])
+    .slice(0, 10)
+    .map((r) => `  - "${r.query}": position ${r.position ?? '—'}, ${r.clicks || 0} clicks, ${r.impressions || 0} impressions`)
+    .join('\n')
+  return (
+    `LIVE GOOGLE SEARCH CONSOLE DATA (last 28 days) — use this REAL data, not guesses:\n` +
+    `${idx}\n` +
+    `Keywords this page already ranks for:\n${kws || '  (none in range)'}\n\n` +
+    `Priorities to weigh: flag the page if it is NOT indexed; call out "money" keywords stuck on ` +
+    `page 2 (positions 11–20) as the biggest quick-win opportunities; note keywords with high ` +
+    `impressions but low clicks (title/meta problem).\n\n`
+  )
+}
+
 export const AGENTS = [
   {
     id: 'update',
@@ -76,11 +96,12 @@ export const AGENTS = [
     system:
       `You are an elite conversion copywriter and brand-voice auditor. ${LUX_CONTEXT}\n\n` +
       'You audit the actual copy on a live page and give blunt, specific, actionable feedback to make it convert better and read more premium. You quote the real copy you find.',
-    // ctx = { site, page }
+    // ctx = { site, page, gsc }
     buildMessage: (ctx) => {
-      const { site, page } = ctx
+      const { site, page, gsc } = ctx
       return (
         `${pageLine(site, page)}\n\n` +
+        gscSummary(gsc) +
         `Use web search to read the live page, then audit its COPY (not technical SEO):\n` +
         `1. Headline & hook — is it compelling for HNWI travellers? Quote it.\n` +
         `2. Clarity, tone & brand voice — does it feel premium/understated or generic?\n` +

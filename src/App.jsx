@@ -97,7 +97,7 @@ export default function App() {
       setBatchProgress(`Auditing ${i + 1}/${list.length} — ${list[i].name}`)
       setSelectedUid(list[i].uid)
       // eslint-disable-next-line no-await-in-loop
-      await runAudit(site, list[i]).catch(() => {})
+      await runAudit(site, list[i], getGsc(list[i].uid)).catch(() => {})
       // eslint-disable-next-line no-await-in-loop
       await new Promise((r) => setTimeout(r, 500))
     }
@@ -185,7 +185,7 @@ export default function App() {
                   onRun={() => {
                     if (!selectedPage) return
                     if (agent.key === 'update') runUpdate(site, selectedPage, instructions[selectedPage.uid] || '', settings).catch(() => {})
-                    else runAudit(site, selectedPage).catch(() => {})
+                    else runAudit(site, selectedPage, getGsc(selectedPage.uid)).catch(() => {})
                   }}
                   onApprove={() => selectedPage && approveUpdate(site, selectedPage, settings).catch(() => {})}
                 />

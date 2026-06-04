@@ -60,11 +60,11 @@ export function useAgent() {
 
   // ---- Copywriting Audit (read-only) ----
   const runAudit = useCallback(
-    async (site, page) => {
+    async (site, page, gscData) => {
       const agent = AGENT_BY_KEY.audit
       mutPage(page.uid, (p) => ({ ...p, audit: { status: 'running', output: '', error: null, ranAt: null } }))
       try {
-        const out = await runAgent(agent.system, agent.buildMessage({ site, page }), agent.tools)
+        const out = await runAgent(agent.system, agent.buildMessage({ site, page, gsc: gscData }), agent.tools)
         mutPage(page.uid, (p) => ({ ...p, audit: { status: 'done', output: out, error: null, ranAt: Date.now() } }))
         return out
       } catch (e) {
