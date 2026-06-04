@@ -36,6 +36,15 @@ export default function BackendPanel({ settings, setSetting, onClose }) {
         are loaded live from this API.
       </p>
 
+      <div className="pt-1" style={{ borderTop: '1px solid var(--border)' }} />
+      <div className="text-[10px] uppercase tracking-widest" style={{ color: 'var(--blue)' }}>Google Search Console</div>
+      <Field label="CTC property" value={settings.ctcGscProperty} onChange={(v) => setSetting('ctcGscProperty', v)} />
+      <Field label="Sigma property" value={settings.sigmaGscProperty} onChange={(v) => setSetting('sigmaGscProperty', v)} />
+      <p className="text-[11px] leading-relaxed" style={{ color: 'var(--muted)' }}>
+        Domain properties use <code style={{ color: 'var(--text)' }}>sc-domain:example.com</code>; URL-prefix properties use the full URL.
+        Rankings + index status come from a serverless proxy that needs <code style={{ color: 'var(--text)' }}>GSC_SERVICE_ACCOUNT_JSON</code> set on Vercel.
+      </p>
+
       <button
         onClick={test}
         disabled={testing}

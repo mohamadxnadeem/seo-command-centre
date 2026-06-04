@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react'
 import { runAgent } from '../services/anthropic'
 import { readFile, proposeFileChange } from '../services/github'
 import { updateCmsSeo } from '../services/django'
+import { fetchPageGsc } from '../services/gsc'
 import { AGENT_BY_KEY, ACTION_PLAN_AGENT } from '../config/agents'
 
 // Pull a JSON object out of model output (tolerates fences/prose).
@@ -32,6 +33,7 @@ export function useAgent() {
   const [pages, setPages] = useState({}) // pages[uid] = { update, audit }
   const [sites, setSites] = useState({}) // sites[siteId] = { social }
   const [reports, setReports] = useState({}) // reports[siteId] = { status, output, error, ranAt }
+  const [gsc, setGsc] = useState({}) // gsc[uid] = { status, top, rows, index, errors, ranAt }
   const pagesRef = useRef(pages)
   pagesRef.current = pages
 
@@ -175,5 +177,25 @@ export function useAgent() {
     }
   }, [])
 
-  return { pages, sites, reports, getPage, getSocial, runAudit, runSocial, runUpdate, approveUpdate, runActionPlan }
+  // ---- Google Search Console: rankings + index status per page ----
+  const getGsc = useCallback((uid) => gsc[uid], [gsc])
+
+  const loadGsc = useCallback(async (site, page, property) => {
+    const fullUrl = `${site.baseUrl}${page.path}`
+    setGsc((prev) => ({ ...prev, [page.uid]: { ...prev[page.uid], status: 'running' } }))
+    try {
+      const data = await fetchPageGsc(property, fullUrl)
+      setGsc((prev) => ({ ...prev, [page.uid]: { status: 'done', ...data, ranAt: Date.now() } }))
+      return data
+    } catch (e) {
+      setGsc((prev) => ({ ...prev, [page.uid]: { status: 'error', error: e.message, ranAt: Date.now() } }))
+      throw e
+    }
+  }, [])
+
+  return {
+    pages, sites, reports, gsc,
+    getPage, getSocial, getGsc,
+    runAudit, runSocial, runUpdate, approveUpdate, runActionPlan, loadGsc,
+  }
 }

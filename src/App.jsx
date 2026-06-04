@@ -8,6 +8,7 @@ import Sidebar from './components/Sidebar'
 import PageHeader from './components/PageHeader'
 import AgentCard from './components/AgentCard'
 import PageMatrix from './components/PageMatrix'
+import GscStatus from './components/GscStatus'
 import GithubPanel from './components/GithubPanel'
 import BackendPanel from './components/BackendPanel'
 import AiPanel from './components/AiPanel'
@@ -22,6 +23,8 @@ const SETTING_DEFS = {
   djangoUrl: { ls: 'django_url', env: ENV.VITE_DJANGO_API_URL, def: 'https://web-production-1ab9.up.railway.app' },
   seoKey: { ls: 'seo_key', env: ENV.VITE_SEO_UPDATE_KEY, def: '' },
   anthropicKey: { ls: 'anthropic_key', env: ENV.VITE_ANTHROPIC_API_KEY, def: '' },
+  ctcGscProperty: { ls: 'ctc_gsc', env: ENV.VITE_CTC_GSC_PROPERTY, def: 'sc-domain:capetown-concierge.co.za' },
+  sigmaGscProperty: { ls: 'sigma_gsc', env: ENV.VITE_SIGMA_GSC_PROPERTY, def: 'sc-domain:sigmachauffeur.vip' },
 }
 
 function loadSettings() {
@@ -41,7 +44,7 @@ export default function App() {
   const [batchProgress, setBatchProgress] = useState(null)
 
   const [reportOpen, setReportOpen] = useState(false)
-  const { pages: pagesState, reports, getPage, getSocial, runAudit, runSocial, runUpdate, approveUpdate, runActionPlan } = useAgent()
+  const { pages: pagesState, reports, getPage, getSocial, getGsc, runAudit, runSocial, runUpdate, approveUpdate, runActionPlan, loadGsc } = useAgent()
 
   const baseSite = SITES[activeSiteId]
   const site = useMemo(
@@ -53,6 +56,7 @@ export default function App() {
   const pages = useMemo(() => [...staticEntries, ...(cmsPages[activeSiteId] || [])], [staticEntries, cmsPages, activeSiteId])
 
   const selectedPage = useMemo(() => pages.find((p) => p.uid === selectedUid) || pages[0], [pages, selectedUid])
+  const gscProperty = activeSiteId === 'ctc' ? settings.ctcGscProperty : settings.sigmaGscProperty
 
   function setSetting(key, value) {
     const def = SETTING_DEFS[key]
@@ -148,6 +152,13 @@ export default function App() {
           <KeywordBanner />
           <PageHeader site={site} page={selectedPage} />
 
+          {selectedPage && (
+            <GscStatus
+              gsc={getGsc(selectedPage.uid)}
+              onRefresh={() => loadGsc(site, selectedPage, gscProperty).catch(() => {})}
+            />
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {AGENTS.map((agent) => {
               if (agent.scope === 'site') {
@@ -182,7 +193,7 @@ export default function App() {
             })}
           </div>
 
-          <PageMatrix site={site} pages={pages} getPage={getPage} selectedUid={selectedPage?.uid} onSelect={setSelectedUid} />
+          <PageMatrix site={site} pages={pages} getPage={getPage} getGsc={getGsc} selectedUid={selectedPage?.uid} onSelect={setSelectedUid} />
           </>
           )}
         </main>

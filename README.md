@@ -23,6 +23,18 @@ There are three Claude agents (model `claude-sonnet-4-20250514`):
 
 Both sites **target different primary keywords** so Google never ranks them against each other (see the banner in the UI).
 
+### Rankings & index status (Google Search Console)
+
+Each page shows its **index status** and the **keywords it actually ranks for** (with average position), pulled live from Google Search Console via the `/api/gsc` serverless proxy. One-time setup:
+
+1. **Google Cloud:** create a project → **enable the "Google Search Console API"** → create a **service account** → create a **JSON key** for it.
+2. **Search Console:** in each verified property (`capetown-concierge.co.za`, `sigmachauffeur.vip`) → Settings → **Users and permissions** → add the **service account's email** as a **Full** (or Owner) user.
+3. **Vercel:** add an env var **`GSC_SERVICE_ACCOUNT_JSON`** = the entire JSON key (one line). Redeploy.
+4. In the app's **Django** panel, set each site's **GSC property** (domain properties use `sc-domain:example.com`).
+5. On a page, click **Load GSC** (or it's in the Search Console card under the page header). The Pages Matrix gains **Indexed** + **Best pos** columns.
+
+> GSC only works on the Vercel deployment (or `vercel dev`) — a plain `npm run dev` has no serverless functions, so `/api/gsc` returns 404 there.
+
 ### Backend requirement
 
 The CMS update path needs the companion PR on **`why-cpt-backend`** (branch `seo/cms-seo-update-endpoint`) merged, and `SEO_UPDATE_KEY` set as an env var on the server. It adds `PATCH /api/experiences/<id>/seo/` and `PATCH /api/cars-for-hire/<id>/seo/`.
