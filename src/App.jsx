@@ -11,6 +11,7 @@ import PageMatrix from './components/PageMatrix'
 import GithubPanel from './components/GithubPanel'
 import BackendPanel from './components/BackendPanel'
 import AiPanel from './components/AiPanel'
+import ReportView from './components/ReportView'
 
 const ENV = import.meta.env
 const SETTING_DEFS = {
@@ -39,7 +40,8 @@ export default function App() {
   const [instructions, setInstructions] = useState({}) // instructions[uid] = text
   const [batchProgress, setBatchProgress] = useState(null)
 
-  const { getPage, getSocial, runAudit, runSocial, runUpdate, approveUpdate } = useAgent()
+  const [reportOpen, setReportOpen] = useState(false)
+  const { pages: pagesState, reports, getPage, getSocial, runAudit, runSocial, runUpdate, approveUpdate, runActionPlan } = useAgent()
 
   const baseSite = SITES[activeSiteId]
   const site = useMemo(
@@ -108,6 +110,8 @@ export default function App() {
         onToggleAi={() => setPanel(panel === 'ai' ? null : 'ai')}
         onToggleDjango={() => setPanel(panel === 'django' ? null : 'django')}
         onToggleGithub={() => setPanel(panel === 'github' ? null : 'github')}
+        onToggleReport={() => setReportOpen((v) => !v)}
+        reportOpen={reportOpen}
         aiReady={!!settings.anthropicKey}
         djangoReady={!!settings.seoKey}
         githubReady={!!settings.githubToken}
@@ -130,6 +134,17 @@ export default function App() {
         />
 
         <main className="flex-1 min-w-0 scroll-area p-5">
+          {reportOpen ? (
+            <ReportView
+              site={site}
+              entries={pages}
+              pagesState={pagesState}
+              report={reports[activeSiteId]}
+              onGenerate={(digest) => runActionPlan(site, digest).catch(() => {})}
+              onClose={() => setReportOpen(false)}
+            />
+          ) : (
+          <>
           <KeywordBanner />
           <PageHeader site={site} page={selectedPage} />
 
@@ -168,6 +183,8 @@ export default function App() {
           </div>
 
           <PageMatrix site={site} pages={pages} getPage={getPage} selectedUid={selectedPage?.uid} onSelect={setSelectedUid} />
+          </>
+          )}
         </main>
       </div>
     </div>

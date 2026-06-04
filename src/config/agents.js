@@ -125,3 +125,21 @@ export const AGENT_BY_KEY = AGENTS.reduce((acc, a) => {
   acc[a.key] = a
   return acc
 }, {})
+
+// Synthesis pass: turns all per-page copy audits into one prioritised site plan.
+export const ACTION_PLAN_AGENT = {
+  system:
+    `You are a senior SEO & conversion strategist. ${LUX_CONTEXT}\n\n` +
+    'You are given a set of per-page copy/SEO audits for one website. Synthesise them into a single, prioritised ACTION PLAN. ' +
+    'Output clean GitHub-flavoured Markdown only. Be specific, reference real pages, and rank by impact.',
+  buildMessage: (site, digest) =>
+    `Website: ${site.name} (${site.domain}) — ${site.baseUrl}\n\n` +
+    `Here are the per-page audits:\n\n${digest}\n\n` +
+    `Produce a Markdown report with these sections:\n` +
+    `1. **Executive summary** — 3-4 sentences on the overall state of the site's copy/SEO.\n` +
+    `2. **Priority actions** — a ranked list (highest impact first). For each: the page, the issue, the recommended fix, and an Impact (High/Med/Low) + Effort (High/Med/Low) tag.\n` +
+    `3. **Quick wins** — 3-5 changes that take minutes but matter.\n` +
+    `4. **Per-page next step** — one line per page with its single most important action.\n` +
+    `Keep it tight and actionable.`,
+}
+

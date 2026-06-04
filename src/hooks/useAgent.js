@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react'
 import { runAgent } from '../services/anthropic'
 import { readFile, proposeFileChange } from '../services/github'
 import { updateCmsSeo } from '../services/django'
-import { AGENT_BY_KEY } from '../config/agents'
+import { AGENT_BY_KEY, ACTION_PLAN_AGENT } from '../config/agents'
 
 // Pull a JSON object out of model output (tolerates fences/prose).
 export function parseJsonObject(text) {
@@ -31,6 +31,7 @@ const emptyAgent = () => ({ status: 'idle', output: '', error: null, ranAt: null
 export function useAgent() {
   const [pages, setPages] = useState({}) // pages[uid] = { update, audit }
   const [sites, setSites] = useState({}) // sites[siteId] = { social }
+  const [reports, setReports] = useState({}) // reports[siteId] = { status, output, error, ranAt }
   const pagesRef = useRef(pages)
   pagesRef.current = pages
 
@@ -160,5 +161,19 @@ export function useAgent() {
     [getPage, mutPage]
   )
 
-  return { pages, sites, getPage, getSocial, runAudit, runSocial, runUpdate, approveUpdate }
+  // ---- Action plan: synthesise all audits into one prioritised plan ----
+  const runActionPlan = useCallback(async (site, digest) => {
+    if (!digest?.trim()) throw new Error('No audits yet — run the Copywriting Audit on some pages first.')
+    setReports((prev) => ({ ...prev, [site.id]: { status: 'running', output: '', error: null, ranAt: null } }))
+    try {
+      const out = await runAgent(ACTION_PLAN_AGENT.system, ACTION_PLAN_AGENT.buildMessage(site, digest), [])
+      setReports((prev) => ({ ...prev, [site.id]: { status: 'done', output: out, error: null, ranAt: Date.now() } }))
+      return out
+    } catch (e) {
+      setReports((prev) => ({ ...prev, [site.id]: { status: 'error', output: '', error: e.message, ranAt: Date.now() } }))
+      throw e
+    }
+  }, [])
+
+  return { pages, sites, reports, getPage, getSocial, runAudit, runSocial, runUpdate, approveUpdate, runActionPlan }
 }

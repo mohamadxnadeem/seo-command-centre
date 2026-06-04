@@ -7,6 +7,8 @@ export default function TopBar({
   onToggleDjango,
   onToggleGithub,
   onToggleAi,
+  onToggleReport,
+  reportOpen,
   djangoReady,
   githubReady,
   aiReady
@@ -53,6 +55,17 @@ export default function TopBar({
 
       {/* Config buttons */}
       <div className="flex items-center gap-2">
+        <button
+          onClick={onToggleReport}
+          className="px-3 py-1.5 rounded-md text-[12px] font-semibold"
+          style={{
+            border: `1px solid var(--green)`,
+            color: reportOpen ? '#04140b' : 'var(--green)',
+            background: reportOpen ? 'var(--green)' : 'transparent',
+          }}
+        >
+          ▤ Report
+        </button>
         <ConfigButton label="AI" ok={aiReady} onClick={onToggleAi} />
         <ConfigButton label="Django" ok={djangoReady} onClick={onToggleDjango} />
         <ConfigButton label="GitHub" ok={githubReady} onClick={onToggleGithub} />
